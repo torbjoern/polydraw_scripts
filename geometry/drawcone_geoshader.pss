@@ -1,0 +1,148 @@
+   //Host code (EVAL)
+
+static t;
+()
+{
+   glsetshader("vertex_shader","g","fragment_shader");
+   
+   t = klock();
+   r = -4; //10
+   ang = -t*0.5;
+   gluLookAt(r*cos(ang),2,r*sin(ang),
+             0,0,0,
+             0,1,0);
+   //test1();
+   //test2();
+   abstract_art();
+}
+
+test1(){
+
+   glBegin(GL_LINES);
+   glVertex(-1,1,0, .25);
+   glVertex(-1,0,0, .01);
+   glEnd();
+
+   glBegin(GL_LINES);
+   glVertex(-2,1,0, -.25);
+   glVertex(-2,1,1, .25);
+   glEnd();
+   
+   glBegin(GL_LINES);
+   glVertex(0, 0, -1, .25);
+   glVertex(0, 0, +1, .25);
+   glEnd();
+   
+   glBegin(GL_LINES);
+   glVertex(+1, 0, 0, .5);
+   glVertex(+1, 1, 0, .001);
+   glEnd();
+}
+
+test2(){
+   for (i=0; i<10000; i++){
+   glBegin(GL_LINES);
+     glVertex( nrnd, nrnd, nrnd, 0.1+0.05*rnd );
+     glVertex( nrnd, nrnd, nrnd, 0.1 );
+   glEnd();
+   }
+}
+
+abstract_art(){
+   ta = cos(t)*sin(t);
+   tb = sin(t)*sin(t);
+   tc = cos(t);
+   ts = sin(t);
+   
+   glBegin(GL_LINES);
+   for(x=-1; x<2; x++)
+   for(y=-1; y<2; y++)
+   for(z=-1; z<2; z++)
+   {
+     glVertex(-x*ta, -y*ta, -z*ta, .1*ts);
+     glVertex(+x*tb, +y*tb, +z*tb, .1*tc);
+   }
+   glEnd();
+}
+
+@v:vertex_shader //================================ Passthru vertex
+#version 120
+void main ()
+{
+   gl_Position = gl_Vertex;
+}
+
+
+
+// input:lines
+// output: triangle strip
+// primCount
+
+//layout(lines) in; // points/lines/LINES_ADJACENCY/TRIANGLES/TRIANGLES_ADJACENCY
+//layout(triangle_strip) out; //  points, line_strip, and triangle_strip
+//layout(max_vertices = 12) out;
+
+@g,GL_LINES,GL_TRIANGLE_STRIP,32:g
+#version 120
+#extension GL_EXT_geometry_shader4 : enable
+
+varying out vec3 normal;
+
+// given to points p1 and p2 create a vector out
+// that is perpendicular to (p2-p1)
+vec3 createPerp(vec3 p1, vec3 p2)
+{
+  vec3 invec = normalize(p2 - p1);
+  vec3 ret = cross( invec, vec3(0.0, 0.0, 1.0) );
+  if ( length(ret) == 0.0 )
+  {
+    ret = cross( invec, vec3(0.0, 1.0, 0.0) );
+  }
+  return ret;
+}
+/*
+vec3 rotate( vec3 v, float a )
+{
+  float ca = cos(a); float sa = sin(a);
+  float x = ca * v.x - sa*v.z;
+  float z = sa * v.x + ca*v.z;
+  return vec3( x, v.y, z );
+}
+*/
+void main()
+{
+   mat4 mvp = gl_ModelViewProjectionMatrix;
+
+
+   float r1 = gl_PositionIn[0].w;
+   float r2 = gl_PositionIn[1].w;
+
+   vec3 axis = gl_PositionIn[1].xyz - gl_PositionIn[0].xyz;
+
+   vec3 perpx = createPerp( gl_PositionIn[1].xyz, gl_PositionIn[0].xyz );
+   vec3 perpy = cross( normalize(axis), perpx );
+   int segs = 16;
+   for(int i=0; i<segs; i++) {
+      float a = i/float(segs-1) * 2.0 * 3.14159;
+      float ca = cos(a); float sa = sin(a);
+      normal = vec3( ca*perpx.x + sa*perpy.x,
+                     ca*perpx.y + sa*perpy.y,
+                     ca*perpx.z + sa*perpy.z );
+
+      vec3 p1 = gl_PositionIn[0].xyz + r1*normal;
+      vec3 p2 = gl_PositionIn[1].xyz + r2*normal;
+      
+      gl_Position = mvp * vec4(p1, 1.0); EmitVertex();
+      gl_Position = mvp * vec4(p2, 1.0); EmitVertex();       
+   }
+   EndPrimitive();   
+}
+
+@f:fragment_shader //================================
+#version 120
+
+varying vec3 normal;
+void main ()
+{
+   gl_FragColor = vec4(.5+.5*normal,1);
+}
