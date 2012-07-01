@@ -1,0 +1,140 @@
+   //Host code (EVAL)
+
+static t;
+()
+{
+   glsetshader("vertex_shader","g","fragment_shader");
+   glCullFace(GL_BACK);   
+   t = klock();
+   ang = -t*.5;
+
+if(1){
+   r = -50;
+   gluLookAt(r*cos(ang),2,r*sin(ang),
+             0,0,0,
+             0,1,0);
+   test1();
+} else {
+  static mat[9];
+  ang2mat(2*PI*mousx/xres,2*PI*mousy/yres,mat);
+  r = -2;
+  gluLookAt( r*mat[6], r*mat[7], r*mat[8], 0,0,0, mat[3], mat[4], mat[5] );
+  single_cube();
+}
+
+
+}
+
+single_cube()
+{
+   glBegin(GL_POINTS);
+   glVertex(0,0,0);
+   glEnd();
+}
+
+test1()
+{
+sep=1;
+
+n = 10; // BRING THE NOISE!
+m = 40;
+lowerb = m*-.5;
+
+if ( numframes==0) {
+ printf("PROGRAM BEGIN!\n");
+ printf("m^3 = %g\n",m*m*m);
+}
+
+tx = mousx/xres*2;
+ty = mousy/yres*2;
+static tz = 0;
+if ( bstatus==1 ) tz += .01;
+
+glBegin(GL_POINTS);
+ for(i=0; i<m; i++){
+ for(j=0; j<m; j++){
+ for(k=0; k<m; k++){
+
+   if ( noise(i/n+tx,j/n+ty,k/n+tz) > 0 )
+    glVertex( sep*(lowerb + i), sep*(lowerb+j), sep*(lowerb+k) );
+  }}}
+glEnd();   
+}
+
+ang2mat(hang,vang,mat[9])
+{
+   mat[0] = cos(hang); mat[1] = 0; mat[2]=-sin(hang);
+   mat[6] = cos(vang)*sin(hang); mat[7] = sin(vang); mat[8]=cos(vang)*cos(hang);
+   mat[3] = mat[7]*mat[2] - mat[8]*mat[1];
+   mat[4] = mat[8]*mat[0] - mat[6]*mat[2];
+   mat[5] = mat[6]*mat[1] - mat[7]*mat[0];
+}
+
+
+@v:vertex_shader //================================ Passthru vertex
+#version 120
+void main ()
+{
+   gl_Position = gl_Vertex;
+}
+
+
+
+// input:lines
+// output: triangle strip
+// primCount
+
+//layout(lines) in; // points/lines/LINES_ADJACENCY/TRIANGLES/TRIANGLES_ADJACENCY
+//layout(triangle_strip) out; //  points, line_strip, and triangle_strip
+//layout(max_vertices = 12) out;
+
+// 6 faces * 4 pr face = 24 primitives generated
+@g,GL_POINTS,GL_TRIANGLE_STRIP,24:g
+#version 120
+#extension GL_EXT_geometry_shader4 : enable
+
+varying out vec3 normal;
+
+void face(vec3 a, vec3 d)
+{ 
+   vec3 b = a;
+   vec3 c = a;
+  if (a.y == d.y) {
+    c.z = d.z; 
+    b.x = d.x;
+  } else {
+    b.y = d.y;
+    c.xz = d.xz;
+  }
+
+  normal = 1.0*cross( b-a, b-c );
+   gl_Position = gl_ModelViewProjectionMatrix * (vec4(gl_PositionIn[0].xyz+a, 1)); EmitVertex();
+   gl_Position = gl_ModelViewProjectionMatrix * (vec4(gl_PositionIn[0].xyz+b, 1)); EmitVertex();
+   gl_Position = gl_ModelViewProjectionMatrix * (vec4(gl_PositionIn[0].xyz+c, 1)); EmitVertex();
+   gl_Position = gl_ModelViewProjectionMatrix * (vec4(gl_PositionIn[0].xyz+d, 1)); EmitVertex();
+  EndPrimitive();   
+}
+
+void main()
+{
+// l r b t n f
+// expects 2 opposite corners in the same plane
+
+   face( +vec3(-.5,-.5,-.5),  +vec3(-.5,+.5,+.5) ); // +x
+   face( +vec3(+.5,-.5,+.5),  +vec3(+.5,+.5,-.5) ); // -x
+
+   face( +vec3(-.5,-.5,+.5), +vec3(+.5,-.5,-.5) ); // bottom
+   face( -vec3(-.5,-.5,-.5), -vec3(+.5,-.5,+.5) ); // top
+
+   face( +vec3(+.5,-.5,-.5), +vec3(-.5,+.5,-.5) ); //front
+   face( -vec3(-.5,-.5,-.5), -vec3(+.5,+.5,-.5) ); //back
+}
+
+@f:fragment_shader //================================
+#version 120
+
+varying vec3 normal;
+void main ()
+{
+   gl_FragColor = vec4(.5+.5*normal,1);
+}
